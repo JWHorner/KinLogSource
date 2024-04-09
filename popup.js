@@ -1,5 +1,5 @@
 // Global
-let deletionWarnings = [ 'Clear Chat', 'Really?', 'You\'re 100% sure?' ];
+let deletionWarnings = ['Clear Chat', 'Really?', 'You\'re 100% sure?'];
 let deletionIndex = 0;
 
 // Version
@@ -7,6 +7,16 @@ document.getElementById('version').innerText = `v${chrome.runtime.getManifest().
 
 // Delete button
 document.getElementById('delete').innerText = deletionWarnings[0];
+
+function getCurrentTab(callback) {
+    let queryOptions = { active: true, lastFocusedWindow: true };
+    chrome.tabs.query(queryOptions, ([tab]) => {
+      if (chrome.runtime.lastError)
+      console.error(chrome.runtime.lastError);
+      // `tab` will either be a `tabs.Tab` instance or `undefined`.
+      callback(tab);
+    });
+  }
 
 function triggerDownload(fileType) {
     chrome.tabs.query({ 'active': true, 'lastFocusedWindow': true }, function (tabs) {
@@ -29,13 +39,12 @@ function downloadJson() {
 function deleteClicked() {
     let btn = document.getElementById('delete');
     if (deletionIndex === deletionWarnings.length - 1) {
-        
-        //alert('TODO: Clear chat log');
+
         chrome.tabs.query({ 'active': true, 'lastFocusedWindow': true }, function (tabs) {
             chrome.tabs.sendMessage(tabs[0].id, { type: "deleteConversation" }, function (response) {
                 document.getElementById('currentchatSize').innerText = '0.00 KB';
                 document.getElementById('buttons').style.display = 'none';
-             });
+            });
         });
 
         deletionIndex = 0;
@@ -45,12 +54,18 @@ function deleteClicked() {
     }
 }
 
+function manageClicked() {
+    //chrome.action.setPopup({popup: "manage.html"});
+    location.href = 'manage.html'
+}
+
 // Button events
 document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('textDownload').addEventListener('click', downloadText);
     document.getElementById('htmlDownload').addEventListener('click', downloadHtml);
     document.getElementById('jsonDownload').addEventListener('click', downloadJson);
     document.getElementById('delete').addEventListener('click', deleteClicked);
+    document.getElementById('manage').addEventListener('click', manageClicked);
 });
 
 chrome.tabs.query({ 'active': true, 'lastFocusedWindow': true }, function (tabs) {
@@ -83,3 +98,4 @@ chrome.tabs.query({ 'active': true, 'lastFocusedWindow': true }, function (tabs)
     }
 
 });
+

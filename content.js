@@ -1,9 +1,24 @@
 let groupChatIdentifier = '/groupchat/'
 let kinLogPrefix = 'KinLog_';
 let kinLogSigsSuffix = '_Sigs';
+let kinLogSettingsSuffix = '_Set';
+// TODO: Use these
+let host = 'https://kindroid.ai';
+let kinUrl = `${host}/home`;
+
+function getKinOrGroup() {
+    if (window.location.href === 'https://kindroid.ai/home') {
+        // Solo chat
+        return 'k';
+    } else if (window.location.href.indexOf(`https://kindroid.ai${groupChatIdentifier}`) === 0) {
+        // Group chat
+        return 'g';
+    }
+    return undefined;
+}
 
 function getCurrentChatId() {
-    if (window.location.href === 'https://kindroid.ai/home'){
+    if (window.location.href === 'https://kindroid.ai/home') {
         // Solo chat
         return localStorage.getItem('currentAI');
     } else if (window.location.href.indexOf(`https://kindroid.ai${groupChatIdentifier}`) === 0) {
@@ -14,7 +29,7 @@ function getCurrentChatId() {
 }
 
 function getCurrentChatName() {
-    if (window.location.href === 'https://kindroid.ai/home'){
+    if (window.location.href === 'https://kindroid.ai/home') {
         return [...document.querySelectorAll('img[alt="play"]')].slice(-1)[0].previousElementSibling.innerText;
     } else if (window.location.href.indexOf(`https://kindroid.ai${groupChatIdentifier}`) === 0) {
         return document.getElementsByClassName('chatScrollParent ')[0].childNodes[0].childNodes[0].innerText;
@@ -22,10 +37,11 @@ function getCurrentChatName() {
     return undefined;
 }
 
-function getCurrentChatSize() {
-    let chat = localStorage.getItem(`${kinLogPrefix}${getCurrentChatId()}`);
-    if (chat === null) {
-        return '0 kb';
+function getChatSize(id) {
+    id = id || getCurrentChatId();
+    let chat = localStorage.getItem(`${kinLogPrefix}${id}`);
+    if (!chat) {
+        return '0.00 KB';
     }
     return `${(chat.length / 1024).toFixed(2)} KB`;
 }
@@ -34,16 +50,44 @@ function setSpeechSignatures(signatures) {
     localStorage.setItem(`${kinLogPrefix}${getCurrentChatId()}${kinLogSigsSuffix}`, JSON.stringify(signatures));
 }
 
-function getConversation() {
-    let conversation = JSON.parse(localStorage.getItem(`${kinLogPrefix}${getCurrentChatId()}`));
+function getConversation(id) {
+    id = id ?? getCurrentChatId();
+    let conversation = JSON.parse(localStorage.getItem(`${kinLogPrefix}${id}`));
     if (!conversation) {
         conversation = [];
     }
     return conversation;
 }
 
+function getConversationSettings(id) {
+    id = id || getCurrentChatId();
+    return JSON.parse(localStorage.getItem(`${kinLogPrefix}${id}${kinLogSettingsSuffix}`));
+    /*if (id) {
+        return JSON.parse(localStorage.getItem(`${kinLogPrefix}${id}${kinLogSettingsSuffix}`));
+    }
+    return JSON.parse(localStorage.getItem(`${kinLogPrefix}${getCurrentChatId()}${kinLogSettingsSuffix}`));*/
+}
+
+function setConversationSettings(len) {
+    localStorage.setItem(`${kinLogPrefix}${getCurrentChatId()}${kinLogSettingsSuffix}`, JSON.stringify([
+        getCurrentChatName(),
+        getKinOrGroup(),
+        len < 10 ? new Date().toISOString() : ''
+    ]));
+}
+
+function deleteConversation(id) {
+    localStorage.removeItem(`${kinLogPrefix}${id}`);
+    localStorage.removeItem(`${kinLogPrefix}${id}${kinLogSettingsSuffix}`);
+    localStorage.removeItem(`${kinLogPrefix}${id}${kinLogSigsSuffix}`);
+}
+
 function setConversation(conversation) {
     localStorage.setItem(`${kinLogPrefix}${getCurrentChatId()}`, JSON.stringify(conversation));
+    if (!getConversationSettings()) {
+        console.log(conversation);
+        setConversationSettings(conversation.length);
+    }
 }
 
 function createSignature(convo) {
@@ -97,14 +141,26 @@ function checkSpeech() {
             setConversation(conversation);
         }
     }
+
+    //let inputs = document.getElementsByTagName('input')
+
+    if (document.querySelectorAll('[placeholder="Confirmation"]') !== undefined) {
+        //console.log('deleting');
+        //alert('modal!');
+    }
+
+    /*if (document.getElementsByClassName('chakra-modal__body') !== undefined) {
+        //alert('modal!');
+    }*/
 }
 
 function getTimestamp() {
     return new Date().toISOString().replace(/[-T:]/g, '').substring(0, 14);
 }
 
-function download(extension, text) {
-    let filename = `${getCurrentChatName()}_${getTimestamp()}.${extension}`;
+function download(extension, text, name) {
+    name = name ?? getCurrentChatName();
+    let filename = `${name}_${getTimestamp()}.${extension}`;
 
     var element = document.createElement('a');
     element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
@@ -124,8 +180,8 @@ function downloadHeader() {
     return header;
 }
 
-function downloadTxt() {
-    let convo = getConversation();
+function downloadTxt(id, name) {
+    let convo = getConversation(id);
     let txt = '';
     let header = downloadHeader();
     for (let i = 0; i < header.length; i++) {
@@ -136,11 +192,11 @@ function downloadTxt() {
         txt += `${convo[i][0]}\r\n`;
         txt += `${convo[i][1]}\r\n\r\n`;
     }
-    download('txt', txt);
+    download('txt', txt, name);
 }
 
-function downloadHtml() {
-    let convo = getConversation();
+function downloadHtml(id, name) {
+    let convo = getConversation(id);
     let html = '<html><head><style>h2 {margin-bottom:0px;} .header{ margin-top:0px; font-style: italic; font-weight: bold; }</style></head><body>';
     let header = downloadHeader();
     let first = true;
@@ -152,16 +208,16 @@ function downloadHtml() {
     }
     for (let i = 0; i < convo.length; i++) {
         html += `<p><strong>${convo[i][0]}</strong><br />`;
-        html += `${convo[i][1]}</p>`;
+        html += `${convo[i][1].replace(/(\*.+?\*)/g, '<i>$1</i>')}</p>`;
     }
     html += '</html></body>';
-    download('html', html);
+    download('html', html, name);
 }
 
-function downloadJson() {
+function downloadJson(id, name) {
     let meta = { 'source': chrome.runtime.getManifest().name, 'version': chrome.runtime.getManifest().version_name, 'author': chrome.runtime.getManifest().author, url: 'https://github.com/JWHorner/KinLog' };
-    let json = { 'about': downloadHeader(), 'meta': meta, 'chat': getConversation() };
-    download('json', JSON.stringify(json));
+    let json = { 'about': downloadHeader(), 'meta': meta, 'chat': getConversation(id) };
+    download('json', JSON.stringify(json), name);
 }
 
 setInterval(() => {
@@ -173,25 +229,69 @@ chrome.runtime.onMessage.addListener(
 
         if (request["type"] == 'requestConversationData') {
 
-            sendResponse(JSON.stringify([ 
-                getCurrentChatName(), 
-                getCurrentChatId(), 
-                getCurrentChatSize()
+            sendResponse(JSON.stringify([
+                getCurrentChatName(),
+                getCurrentChatId(),
+                getChatSize()
             ]));
 
         } else if (request['type'] == 'downloadConversation') {
 
+            let id = !request['id'] ? getCurrentChatId() : request['id'];
+            let name = !request['name'] ? getCurrentChatName() : request['name'];
             if (request['fileType'] == 'txt') {
-                downloadTxt();
+                downloadTxt(id, name);
             } else if (request['fileType'] == 'html') {
-                downloadHtml();
+                downloadHtml(id, name);
             } else if (request['fileType'] == 'json') {
-                downloadJson();
+                downloadJson(id, name);
             }
 
         } else if (request['type'] == 'deleteConversation') {
-            setConversation([]);
+
+            //setConversation([]);
+            deleteConversation(!request['id'] ? getCurrentChatId() : request['id']);
             sendResponse(true);
+
+        } else if (request['type'] == 'getConversationsMeta') {
+
+            let items = Object.keys(localStorage);
+            let meta = [];
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].match(/KinLog_[^_]+$/)) {
+                    let id = items[i].substring(7);
+                    let settings = getConversationSettings(id);
+                    let name = settings ? settings[0] : id;
+                    let kinOrGroup = settings ? settings[1] : undefined;
+                    let date = settings ? settings[2] : undefined;
+                    meta.push([
+                        id,
+                        name,
+                        date,
+                        getChatSize(id),
+                        kinOrGroup
+                    ]);
+                }
+            }
+            //console.log(meta);
+            sendResponse(meta);
+
+        } else if (request['type'] == 'moveToChat') {
+
+            //let id = request.id;
+            //let kinOrGroup = request.kinOrGroup;
+            //alert(`moving to ${id} for ${kinOrGroup}`);
+            let url = '';
+            if (request.kinOrGroup === 'k') {
+                localStorage.setItem('currentAI', request.id);
+                url = 'https://kindroid.ai/home';
+            } else {
+                url = `https://kindroid.ai${groupChatIdentifier}${request.id}`;
+            }
+            location.href = url;
+
+        } else if (request['type'] === 'urlIsKindroid') {
+            return window.location.href.indexOf(host) === 0;
         }
 
         return true;
