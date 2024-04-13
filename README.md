@@ -1,0 +1,1 @@
+KinLog source code permanently moved to [KinLog](https://github.com/JWHorner/KinLog) repository.
